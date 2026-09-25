@@ -3,9 +3,11 @@ import SwiftUI
 
 struct DiagnosticView: View {
     @State var istoggle: Bool = false
+    @State private var monitor = NetworkMonitor()
     @AppStorage("lastSync") var lastSync: Double = 0
     @Query(filter: #Predicate<PendingOperation> { $0.state != "successful" }) var openOperations:
         [PendingOperation]
+
 
     var failedCount: Int{
         openOperations.filter({ $0.state == "failed" }).count
@@ -25,8 +27,8 @@ struct DiagnosticView: View {
                 HStack {
                     Text("Red")
                     Spacer()
-                    Image(systemName: "circle.fill").foregroundStyle(Color.green)
-                    Text("Conected")
+                    Image(systemName: "circle.fill").foregroundStyle(monitor.isConnected ? Color.green : Color.red)
+                    Text(monitor.isConnected ? "Connected" : "Disconnected")
                 }
                 HStack {
                     Text("Last sync")
