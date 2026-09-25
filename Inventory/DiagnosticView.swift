@@ -3,6 +3,7 @@ import SwiftUI
 
 struct DiagnosticView: View {
     @State var istoggle: Bool = false
+    @AppStorage("lastSync") var lastSync: Double = 0
     @Query(filter: #Predicate<PendingOperation> { $0.state != "successful" }) var openOperations:
         [PendingOperation]
 
@@ -30,7 +31,7 @@ struct DiagnosticView: View {
                 HStack {
                     Text("Last sync")
                     Spacer()
-                    Text("5 minutes ago")
+                    Text(lastSync == 0 ? "Never" : Date(timeIntervalSince1970: lastSync).formatted(date: .complete, time: .shortened))
                 }
                 HStack {
                     

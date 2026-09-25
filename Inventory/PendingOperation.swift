@@ -74,6 +74,7 @@ public enum OperationType: String, Codable {
                 try await ProductAPI.deleteProduct(productId: id)
                 state = "successful"
             }
+            UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: "lastSync")
         } catch {
             print("Error syncing pending operation: \(error)")
             state = "failed"
