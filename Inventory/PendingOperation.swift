@@ -24,6 +24,7 @@ public enum OperationType: String, Codable {
     var deltaStock: Int?
     var state: String
     var tries: Int
+    
 
     init(
         type: OperationType, productName: String, deltaStock: Int? = nil, state: String, tries: Int,
@@ -59,6 +60,10 @@ public enum OperationType: String, Codable {
     }
 
     func sync() async {
+
+        if UserDefaults.standard.bool(forKey: "offlineMode") {
+            return
+        }
 
         do {
 

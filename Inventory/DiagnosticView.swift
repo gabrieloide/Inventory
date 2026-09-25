@@ -2,7 +2,7 @@ import SwiftData
 import SwiftUI
 
 struct DiagnosticView: View {
-    @State var istoggle: Bool = false
+    @AppStorage("offlineMode") var isOfflineMode: Bool = false
     @State private var monitor = NetworkMonitor()
     @AppStorage("lastSync") var lastSync: Double = 0
     @Query(filter: #Predicate<PendingOperation> { $0.state != "successful" }) var openOperations:
@@ -69,15 +69,14 @@ struct DiagnosticView: View {
             }
 
             Section(header: Text("DEVELOPMENT & TESTING")) {
-                Toggle(isOn: $istoggle) {
-
+                Toggle(isOn: $isOfflineMode) {
+                    
                     VStack(alignment: .leading) {
                         Text("Simulate offline mode")
                             .foregroundStyle(Color.black)
                         Text("Force local saving of actions")
                             .font(.system(size: 13))
                             .foregroundStyle(Color(.systemGray))
-
                     }
                 }
             }
