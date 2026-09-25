@@ -86,5 +86,5 @@ struct InventoryView: View {
 }
 
 #Preview {
-    InventoryView().modelContainer(for:[Product.self, PendingOperation.self])
+    InventoryView().modelContainer(for:[Product.self, PendingOperation.self], inMemory: true)
 }
