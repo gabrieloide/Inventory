@@ -1,17 +1,12 @@
-//
-//  InventoryApp.swift
-//  Inventory
-//
-//  Created by Gabriel Fuentes on 20/6/26.
-//
-
 import SwiftUI
+import SwiftData
 
 @main
 struct InventoryApp: App {
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            InventoryTabView().modelContainer(for: [Product.self, PendingOperation.self])
+                
         }
     }
 }

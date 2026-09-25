@@ -1,0 +1,12 @@
+# macOS
+.DS_Store
+
+# Xcode
+xcuserdata/
+*.xcuserstate
+build/
+DerivedData/
+.build/
+
+# Herramientas locales (rutas de mi maquina)
+buildServer.json
