@@ -37,6 +37,7 @@ public enum OperationState: String, Codable {
     var deltaStock: Int?
     var state: OperationState
     var tries: Int
+    static let maxRetries = 3
     
 
     init(
@@ -72,7 +73,10 @@ public enum OperationState: String, Codable {
         state = .successful
     }
 
-    func sync() async {
+    func sync(force: Bool = false) async {
+        if tries >= PendingOperation.maxRetries && !force {
+            return
+        }
 
         if UserDefaults.standard.bool(forKey: AppConstants.Storage.offlineMode) {
             return
@@ -96,6 +100,5 @@ public enum OperationState: String, Codable {
             state = .failed
             tries += 1
         }
-
     }
 }

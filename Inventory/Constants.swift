@@ -1,9 +1,9 @@
 enum AppConstants{
     enum Storage{
-        static let offlineMode = "offlineMode"
-        static let lastSync = "lastSync"
+        nonisolated static let offlineMode = "offlineMode"
+        nonisolated static let lastSync = "lastSync"
     }
     enum API{
-        static let baseURL = "http://localhost:5239"
+        nonisolated static let baseURL = "http://localhost:5239"
     }
 }

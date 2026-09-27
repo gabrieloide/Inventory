@@ -54,7 +54,7 @@ struct DiagnosticView: View {
             ) {
                 Button(action: {
                     Task {
-                        for operation in openOperations { await operation.sync() }
+                        for operation in openOperations { await operation.sync(force: true) }
                     }
                 }) {
                     HStack {
