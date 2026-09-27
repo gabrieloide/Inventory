@@ -5,7 +5,7 @@ import SwiftData
 struct InventoryApp: App {
     var body: some Scene {
         WindowGroup {
-            InventoryTabView().modelContainer(for: [Product.self, PendingOperation.self])
+            InventoryTabView().modelContainer(for: [Product.self, PendingOperation.self, StockChange.self])
                 
         }
     }

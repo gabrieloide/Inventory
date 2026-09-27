@@ -35,20 +35,20 @@ public enum OperationState: String, Codable {
     var productName: String
     var product: Product?
     var deltaStock: Int?
-    var state: OperationState
+    var state: OperationState? = OperationState.pending
     var tries: Int
     static let maxRetries = 3
     
 
     init(
-        type: OperationType, productName: String, deltaStock: Int? = nil, state: OperationState, tries: Int,
+        type: OperationType, productName: String, deltaStock: Int? = nil, state: OperationState? = .pending, tries: Int,
         product: Product?, remoteId: Int? = nil
     ) {
         self.type = type
         self.productName = productName
         self.product = product
         self.deltaStock = deltaStock
-        self.state = state
+        self.state = state ?? .pending
         self.tries = tries
         self.remoteId = remoteId
     }

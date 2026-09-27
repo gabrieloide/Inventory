@@ -3,8 +3,10 @@ import SwiftUI
 
 struct InventoryTabView: View {
     @State private var monitor = NetworkMonitor()
-    @Query(filter: #Predicate<PendingOperation> { $0.state.rawValue != "successful" })
-    var openOperations: [PendingOperation]
+    @Query var allOperations: [PendingOperation]
+    var openOperations: [PendingOperation] {
+        allOperations.filter { ($0.state ?? .pending) != .successful }
+    }
 
     func syncPendingOperations() async {
         for operation in openOperations {

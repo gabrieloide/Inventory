@@ -5,17 +5,19 @@ struct DiagnosticView: View {
     @AppStorage(AppConstants.Storage.offlineMode) var isOfflineMode: Bool = false
     @State private var monitor = NetworkMonitor()
     @AppStorage(AppConstants.Storage.lastSync) var lastSync: Double = 0
-    @Query(filter: #Predicate<PendingOperation> { $0.state.rawValue != "successful" })
-    var openOperations: [PendingOperation]
+    @Query var allOperations: [PendingOperation]
+    var openOperations: [PendingOperation] {
+        allOperations.filter { ($0.state ?? .pending) != .successful }
+    }
     
     @State private var isSyncing: Bool = false
 
     var failedCount: Int {
-        openOperations.filter { $0.state == .failed }.count
+        openOperations.filter { ($0.state ?? .pending) == .failed }.count
     }
     
     var pendingCount: Int {
-        openOperations.filter { $0.state == .pending }.count
+        openOperations.filter { ($0.state ?? .pending) == .pending }.count
     }
 
     var body: some View {

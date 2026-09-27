@@ -5,7 +5,10 @@ struct InventoryView: View {
     @State private var isPresented: Bool = false
     @State private var searchText: String = ""
     @Query var product: [Product]
-    @Query(filter: #Predicate<PendingOperation> { $0.state.rawValue != "successful" }) var pendingOperations: [PendingOperation]
+    @Query var allOperations: [PendingOperation]
+    var pendingOperations: [PendingOperation] {
+        allOperations.filter { ($0.state ?? .pending) != .successful }
+    }
     @Environment(\.modelContext) var environment
     
     var filteredProducts: [Product] {

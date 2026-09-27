@@ -72,7 +72,7 @@ struct PendingView: View {
 
     @ViewBuilder
     private func statusBadge(for op: PendingOperation) -> some View {
-        switch op.state {
+        switch op.state ?? .pending {
         case .pending:
             HStack(spacing: 4) {
                 Image(systemName: "clock")
