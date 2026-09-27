@@ -5,20 +5,20 @@ struct DiagnosticView: View {
     @AppStorage(AppConstants.Storage.offlineMode) var isOfflineMode: Bool = false
     @State private var monitor = NetworkMonitor()
     @AppStorage(AppConstants.Storage.lastSync) var lastSync: Double = 0
+
     @Query var allOperations: [PendingOperation]
     var openOperations: [PendingOperation] {
         allOperations.filter { ($0.state ?? .pending) != .successful }
     }
-    
-    @State private var isSyncing: Bool = false
+
     @Environment(\.modelContext) var environment
 
     var failedCount: Int {
         openOperations.filter { ($0.state ?? .pending) == .failed }.count
     }
-    
+
     var pendingCount: Int {
-        openOperations.filter { ($0.state ?? .pending) == .pending }.count
+        openOperations.filter { ($0.state ?? .pending) == .pending || ($0.state ?? .pending) == .inProgress }.count
     }
 
     var body: some View {
@@ -26,7 +26,7 @@ struct DiagnosticView: View {
             List {
                 Section(header: Text("System Status")) {
                     HStack {
-                        Label("Network", systemImage: monitor.isConnected ? "wifi" : "wifi.slash")
+                        Label("Network Status", systemImage: monitor.isConnected ? "wifi" : "wifi.slash")
                         Spacer()
                         HStack(spacing: 5) {
                             Circle()
@@ -38,7 +38,15 @@ struct DiagnosticView: View {
                                 .foregroundStyle(monitor.isConnected ? Color.green : Color.red)
                         }
                     }
-                    
+
+                    HStack {
+                        Label("Sync Engine", systemImage: "arrow.triangle.2.circlepath")
+                        Spacer()
+                        Text(SyncEngine.shared.isSyncing ? "Syncing..." : "Idle")
+                            .font(.subheadline)
+                            .foregroundStyle(SyncEngine.shared.isSyncing ? Color.blue : Color.secondary)
+                    }
+
                     HStack {
                         Label("Last Sync", systemImage: "clock.arrow.circlepath")
                         Spacer()
@@ -46,7 +54,7 @@ struct DiagnosticView: View {
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                     }
-                    
+
                     HStack {
                         Label("Pending Queue", systemImage: "hourglass")
                         Spacer()
@@ -55,7 +63,7 @@ struct DiagnosticView: View {
                             .fontWeight(.medium)
                             .foregroundStyle(.secondary)
                     }
-                    
+
                     HStack {
                         Label("Failed Queue", systemImage: "exclamationmark.triangle")
                         Spacer()
@@ -67,26 +75,26 @@ struct DiagnosticView: View {
                 }
 
                 Section(
-                    header: Text("Synchronization"),
-                    footer: Text("Re-attempts all pending and failed operations immediately against the server.")
+                    header: Text("Synchronization Actions"),
+                    footer: Text("Forces a full flush of all pending operations and reconciles remote server inventory.")
                 ) {
                     Button(action: forceSyncAll) {
                         HStack(spacing: 8) {
-                            if isSyncing {
+                            if SyncEngine.shared.isSyncing {
                                 ProgressView()
                                     .controlSize(.small)
                                     .tint(.white)
                             } else {
                                 Image(systemName: "arrow.clockwise")
                             }
-                            Text(isSyncing ? "Syncing..." : "Force Sync Now")
+                            Text(SyncEngine.shared.isSyncing ? "Syncing..." : "Force Full Sync Now")
                                 .fontWeight(.semibold)
                         }
                         .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.borderedProminent)
                     .tint(.indigo)
-                    .disabled(isSyncing || openOperations.isEmpty)
+                    .disabled(SyncEngine.shared.isSyncing)
                     .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
                     .listRowBackground(Color.clear)
 
@@ -106,12 +114,12 @@ struct DiagnosticView: View {
                     }
                 }
 
-                Section(header: Text("Developer Options")) {
+                Section(header: Text("Developer Simulation")) {
                     Toggle(isOn: $isOfflineMode) {
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Simulate Offline Mode")
                                 .font(.body)
-                            Text("Prevents outgoing sync requests to test local queuing")
+                            Text("Suspends all network synchronization to test local queue buffering")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
@@ -125,13 +133,8 @@ struct DiagnosticView: View {
     }
 
     private func forceSyncAll() {
-        guard !isSyncing else { return }
-        isSyncing = true
         Task {
-            for operation in openOperations {
-                await operation.sync(force: true)
-            }
-            isSyncing = false
+            await SyncEngine.shared.fullSync(context: environment, force: true)
         }
     }
 
@@ -143,6 +146,6 @@ struct DiagnosticView: View {
 }
 
 #Preview {
-    DiagnosticView().modelContainer(
-        for: [Product.self, PendingOperation.self], inMemory: true)
+    DiagnosticView()
+        .modelContainer(for: [Product.self, PendingOperation.self, StockChange.self], inMemory: true)
 }

@@ -10,3 +10,4 @@ DerivedData/
 
 # Herramientas locales (rutas de mi maquina)
 buildServer.json
+.build_test_runner*

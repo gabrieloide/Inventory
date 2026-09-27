@@ -4,13 +4,20 @@ import SwiftUI
 struct InventoryDetails: View {
     @Bindable var p: Product
     @State private var initialStock: Int = 0
-    @Environment(\.modelContext) var environment
-
     @State private var initialName: String = ""
     @State private var initialSku: String = ""
+
+    @Environment(\.modelContext) var environment
     @Environment(\.dismiss) var dismiss
+
     @State private var showingDeleteConfirmation: Bool = false
     @State private var isDeleted: Bool = false
+
+    var hasChanges: Bool {
+        p.stock != initialStock ||
+        p.name.trimmingCharacters(in: .whitespaces) != initialName ||
+        p.sku.trimmingCharacters(in: .whitespaces) != initialSku
+    }
 
     var body: some View {
         List {
@@ -22,7 +29,7 @@ struct InventoryDetails: View {
                     TextField("Product name", text: $p.name)
                         .fontWeight(.medium)
                 }
-                
+
                 HStack {
                     Text("SKU")
                         .foregroundStyle(.secondary)
@@ -30,6 +37,7 @@ struct InventoryDetails: View {
                     TextField("SKU code", text: $p.sku)
                         .fontWeight(.medium)
                         .textInputAutocapitalization(.characters)
+                        .autocorrectionDisabled()
                 }
             }
 
@@ -107,38 +115,51 @@ struct InventoryDetails: View {
             initialSku = p.sku
         }
         .onDisappear {
-            if isDeleted { return }
-            if p.name.trimmingCharacters(in: .whitespaces).isEmpty {
-                p.name = initialName
-            }
-            if p.sku.trimmingCharacters(in: .whitespaces).isEmpty {
-                p.sku = initialSku
-            }
+            saveChangesIfAny()
+        }
+    }
 
-            let stockChanged = p.stock != initialStock
-            let infoChanged = p.name != initialName || p.sku != initialSku
+    private func saveChangesIfAny() {
+        if isDeleted { return }
 
-            if stockChanged || infoChanged {
-                if stockChanged {
-                    let newStockChange = StockChange(
-                        date: Date.now,
-                        delta: p.stock - initialStock,
-                        source: "Local"
-                    )
-                    p.stockChanges.append(newStockChange)
-                }
+        let trimmedName = p.name.trimmingCharacters(in: .whitespaces)
+        let trimmedSku = p.sku.trimmingCharacters(in: .whitespaces).uppercased()
 
-                let newPendingOperation = PendingOperation(
-                    type: .updateStock,
-                    productName: p.name,
-                    deltaStock: stockChanged ? p.stock - initialStock : nil,
-                    state: .pending,
-                    tries: 0,
-                    product: p
-                )
-                environment.insert(newPendingOperation)
-                Task { await newPendingOperation.sync() }
-            }
+        if trimmedName.isEmpty {
+            p.name = initialName
+        }
+        if trimmedSku.isEmpty {
+            p.sku = initialSku
+        }
+
+        let stockChanged = p.stock != initialStock
+        let infoChanged = p.name != initialName || p.sku != initialSku
+
+        guard stockChanged || infoChanged else { return }
+
+        if stockChanged {
+            let delta = p.stock - initialStock
+            let newStockChange = StockChange(
+                date: Date.now,
+                delta: delta,
+                source: "Manual Edit"
+            )
+            p.stockChanges.append(newStockChange)
+        }
+
+        let newPendingOperation = PendingOperation(
+            type: .updateStock,
+            productName: p.name,
+            deltaStock: stockChanged ? p.stock - initialStock : nil,
+            state: .pending,
+            tries: 0,
+            product: p,
+            remoteId: p.remoteId
+        )
+
+        environment.insert(newPendingOperation)
+        Task {
+            await SyncEngine.shared.processQueue(context: environment)
         }
     }
 
@@ -181,7 +202,7 @@ struct InventoryDetails: View {
             )
             environment.insert(deleteOp)
             Task {
-                await deleteOp.sync()
+                await SyncEngine.shared.processQueue(context: environment)
             }
         }
         environment.delete(p)
@@ -191,6 +212,6 @@ struct InventoryDetails: View {
 
 #Preview {
     let p = Product(name: "iPhone 15", sku: "IPH15", stock: 12)
-    InventoryDetails(p: p).modelContainer(
-        for: [Product.self, PendingOperation.self], inMemory: true)
+    InventoryDetails(p: p)
+        .modelContainer(for: [Product.self, PendingOperation.self, StockChange.self], inMemory: true)
 }

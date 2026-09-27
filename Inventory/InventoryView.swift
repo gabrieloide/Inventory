@@ -4,96 +4,89 @@ import SwiftData
 struct InventoryView: View {
     @State private var isPresented: Bool = false
     @State private var searchText: String = ""
-    @Query var product: [Product]
-    @Query var allOperations: [PendingOperation]
-    var pendingOperations: [PendingOperation] {
-        allOperations.filter { ($0.state ?? .pending) != .successful }
-    }
+    @Query(sort: \Product.name) var products: [Product]
     @Environment(\.modelContext) var environment
-    
+
+    @AppStorage(AppConstants.Storage.offlineMode) var isOfflineMode: Bool = false
+
     var filteredProducts: [Product] {
         let trimmed = searchText.trimmingCharacters(in: .whitespaces)
         if trimmed.isEmpty {
-            return product
+            return products
         }
-        return product.filter {
+        return products.filter {
             $0.name.localizedCaseInsensitiveContains(trimmed) ||
             $0.sku.localizedCaseInsensitiveContains(trimmed)
         }
     }
 
-    func refreshRemoteProducts() async {
-        do {
-            let remoteProducts = try await ProductAPI.getProducts()
-            
-            for dto in remoteProducts {
-                let pendingDelete = pendingOperations.contains(where: { $0.remoteId == dto.productId && $0.type == .delete })
-                if pendingDelete { continue }
-
-                if let existing = product.first(where: { $0.remoteId == dto.productId }) {
-                    existing.stock = dto.stock
-                    existing.name = dto.name
-                    existing.sku = dto.sku
-                } else {
-                    let newProduct = Product(name: dto.name, sku: dto.sku, stock: dto.stock, remoteId: dto.productId)
-                    environment.insert(newProduct)
-                }
-            }
-        } catch {
-            print("Error refreshing remote products: \(error)")
-        }
-    }
-    
     var body: some View {
         NavigationStack {
-            Group {
-                if product.isEmpty {
-                    ContentUnavailableView(
-                        "No Products",
-                        systemImage: "shippingbox",
-                        description: Text("Tap + to create your first inventory item.")
-                    )
-                } else if filteredProducts.isEmpty {
-                    ContentUnavailableView.search(text: searchText)
-                } else {
-                    List {
-                        ForEach(filteredProducts) { p in
-                            NavigationLink(destination: InventoryDetails(p: p)) {
-                                HStack(spacing: 12) {
-                                    ZStack {
-                                        RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                            .fill(Color.indigo.opacity(0.12))
-                                            .frame(width: 44, height: 44)
-                                        Image(systemName: "shippingbox.fill")
-                                            .font(.system(size: 20))
-                                            .foregroundStyle(Color.indigo)
-                                    }
-                                    
-                                    VStack(alignment: .leading, spacing: 3) {
-                                        Text(p.name)
-                                            .font(.headline)
-                                            .foregroundStyle(.primary)
-                                        Text("SKU: \(p.sku)")
-                                            .font(.subheadline)
-                                            .foregroundStyle(.secondary)
-                                    }
-                                    
-                                    Spacer()
-                                    
-                                    stockBadge(for: p.stock)
-                                }
-                                .padding(.vertical, 4)
-                            }
-                        }
-                        .onDelete(perform: deleteProducts)
+            VStack(spacing: 0) {
+                if isOfflineMode {
+                    HStack(spacing: 8) {
+                        Image(systemName: "wifi.slash")
+                            .font(.system(size: 13, weight: .semibold))
+                        Text("Simulated Offline Mode Active")
+                            .font(.caption)
+                            .fontWeight(.medium)
+                        Spacer()
                     }
-                    .listStyle(.insetGrouped)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 8)
+                    .background(Color.orange.opacity(0.15))
+                    .foregroundStyle(.orange)
+                }
+
+                Group {
+                    if products.isEmpty {
+                        ContentUnavailableView(
+                            "No Products",
+                            systemImage: "shippingbox",
+                            description: Text("Tap + to create your first inventory item.")
+                        )
+                    } else if filteredProducts.isEmpty {
+                        ContentUnavailableView.search(text: searchText)
+                    } else {
+                        List {
+                            ForEach(filteredProducts) { p in
+                                NavigationLink(destination: InventoryDetails(p: p)) {
+                                    HStack(spacing: 12) {
+                                        ZStack {
+                                            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                                .fill(Color.indigo.opacity(0.12))
+                                                .frame(width: 44, height: 44)
+                                            Image(systemName: "shippingbox.fill")
+                                                .font(.system(size: 20))
+                                                .foregroundStyle(Color.indigo)
+                                        }
+
+                                        VStack(alignment: .leading, spacing: 3) {
+                                            Text(p.name)
+                                                .font(.headline)
+                                                .foregroundStyle(.primary)
+                                            Text("SKU: \(p.sku)")
+                                                .font(.subheadline)
+                                                .foregroundStyle(.secondary)
+                                        }
+
+                                        Spacer()
+
+                                        stockBadge(for: p.stock)
+                                    }
+                                    .padding(.vertical, 4)
+                                }
+                            }
+                            .onDelete(perform: deleteProducts)
+                        }
+                        .listStyle(.insetGrouped)
+                    }
                 }
             }
             .navigationTitle("Inventory")
             .searchable(text: $searchText, prompt: "Search products or SKU")
             .refreshable {
-                await refreshRemoteProducts()
+                await SyncEngine.shared.fullSync(context: environment)
             }
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
@@ -106,7 +99,7 @@ struct InventoryView: View {
             }
         }
         .task {
-            await refreshRemoteProducts()
+            await SyncEngine.shared.fullSync(context: environment)
         }
         .sheet(isPresented: $isPresented) {
             InventoryFormView()
@@ -117,7 +110,7 @@ struct InventoryView: View {
         for index in offsets {
             let item = filteredProducts[index]
             if let remoteId = item.remoteId {
-                let operation = PendingOperation(
+                let deleteOp = PendingOperation(
                     type: .delete,
                     productName: item.name,
                     state: .pending,
@@ -125,13 +118,10 @@ struct InventoryView: View {
                     product: nil,
                     remoteId: remoteId
                 )
-                environment.insert(operation)
+                environment.insert(deleteOp)
                 Task {
-                    await operation.sync()
+                    await SyncEngine.shared.processQueue(context: environment)
                 }
-            }
-            for op in allOperations where op.product == item || (op.remoteId != nil && op.remoteId == item.remoteId) || op.productName == item.name {
-                environment.delete(op)
             }
             environment.delete(item)
         }
@@ -140,7 +130,7 @@ struct InventoryView: View {
     @ViewBuilder
     private func stockBadge(for stock: Int) -> some View {
         let (statusText, color, icon) = stockBadgeDetails(for: stock)
-        
+
         HStack(spacing: 4) {
             Image(systemName: icon)
                 .font(.system(size: 10, weight: .bold))
@@ -166,5 +156,6 @@ struct InventoryView: View {
 }
 
 #Preview {
-    InventoryView().modelContainer(for: [Product.self, PendingOperation.self], inMemory: true)
+    InventoryView()
+        .modelContainer(for: [Product.self, PendingOperation.self, StockChange.self], inMemory: true)
 }

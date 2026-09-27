@@ -2,7 +2,7 @@ import SwiftUI
 import SwiftData
 
 struct PendingView: View {
-    @Query(sort: \PendingOperation.tries, order: .reverse) var operations: [PendingOperation]
+    @Query(sort: \PendingOperation.createdAt, order: .reverse) var operations: [PendingOperation]
     @Environment(\.modelContext) var environment
 
     var body: some View {
@@ -18,22 +18,30 @@ struct PendingView: View {
                     List {
                         Section(
                             header: Text("Sync Queue"),
-                            footer: Text("Operations process automatically when network connectivity is restored.")
+                            footer: Text("Operations process automatically in FIFO order when connectivity is restored.")
                         ) {
                             ForEach(operations) { op in
                                 HStack(spacing: 12) {
                                     operationTypeIcon(for: op.type)
-                                    
-                                    VStack(alignment: .leading, spacing: 2) {
+
+                                    VStack(alignment: .leading, spacing: 3) {
                                         Text(op.productName.isEmpty ? "Product" : op.productName)
                                             .font(.headline)
+
                                         Text(op.type.displayName)
                                             .font(.subheadline)
                                             .foregroundStyle(.secondary)
+
+                                        if let errorMsg = op.errorMessage, (op.state ?? .pending) == .failed {
+                                            Text(errorMsg)
+                                                .font(.caption)
+                                                .foregroundStyle(.red)
+                                                .lineLimit(2)
+                                        }
                                     }
-                                    
+
                                     Spacer()
-                                    
+
                                     statusBadge(for: op)
                                 }
                                 .padding(.vertical, 4)
@@ -47,10 +55,7 @@ struct PendingView: View {
                                 .swipeActions(edge: .leading) {
                                     if (op.state ?? .pending) == .failed {
                                         Button {
-                                            Task {
-                                                op.tries = 0
-                                                await op.sync(force: true)
-                                            }
+                                            retryOperation(op)
                                         } label: {
                                             Label("Retry", systemImage: "arrow.clockwise")
                                         }
@@ -112,12 +117,23 @@ struct PendingView: View {
         }
     }
 
-    private func retryFailedOperations() {
+    private func retryOperation(_ op: PendingOperation) {
+        op.tries = 0
+        op.state = .pending
+        op.errorMessage = nil
         Task {
-            for op in operations where (op.state ?? .pending) == .failed {
-                op.tries = 0
-                await op.sync(force: true)
-            }
+            await SyncEngine.shared.processQueue(context: environment, force: true)
+        }
+    }
+
+    private func retryFailedOperations() {
+        for op in operations where (op.state ?? .pending) == .failed {
+            op.tries = 0
+            op.state = .pending
+            op.errorMessage = nil
+        }
+        Task {
+            await SyncEngine.shared.processQueue(context: environment, force: true)
         }
     }
 
@@ -179,6 +195,19 @@ struct PendingView: View {
             .background(Color.orange.opacity(0.14), in: Capsule())
             .foregroundStyle(Color.orange)
 
+        case .inProgress:
+            HStack(spacing: 4) {
+                ProgressView()
+                    .controlSize(.mini)
+                Text("Syncing")
+                    .font(.caption)
+                    .fontWeight(.semibold)
+            }
+            .padding(.horizontal, 9)
+            .padding(.vertical, 5)
+            .background(Color.blue.opacity(0.14), in: Capsule())
+            .foregroundStyle(Color.blue)
+
         case .successful:
             HStack(spacing: 4) {
                 Image(systemName: "checkmark")
@@ -209,5 +238,6 @@ struct PendingView: View {
 }
 
 #Preview {
-    PendingView().modelContainer(for: [Product.self, PendingOperation.self], inMemory: true)
+    PendingView()
+        .modelContainer(for: [Product.self, PendingOperation.self, StockChange.self], inMemory: true)
 }
