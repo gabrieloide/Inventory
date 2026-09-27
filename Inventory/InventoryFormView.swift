@@ -8,10 +8,17 @@ struct InventoryFormView: View {
     @State var stock: Int = 0
     @Environment(\.dismiss) var dismiss
     @Environment(\.modelContext) var environment
+    var isFormValid: Bool {
+        !name.trimmingCharacters(in: .whitespaces).isEmpty && 
+        !sku.trimmingCharacters(in: .whitespaces).isEmpty
+    }
     
     func saveData(){
-        print("data saved")
-        let product = Product(name: name, sku: sku, stock: stock)
+
+        let trimmedName = name.trimmingCharacters(in: .whitespaces)
+        let trimmedSku = sku.trimmingCharacters(in: .whitespaces)
+
+        let product = Product(name: trimmedName, sku: trimmedSku, stock: stock)
         let pendingOperation = PendingOperation(type: OperationType.make, productName: product.name,deltaStock: nil, state: .pending, tries: 0, product: product)
         
         environment.insert(pendingOperation)
@@ -74,7 +81,9 @@ struct InventoryFormView: View {
                 ToolbarItem(placement: .topBarTrailing){
                     Button(action: {saveData()} ){
                         Text("Save")
+                        
                     }
+                    .disabled(!isFormValid)
                 }
                 
             }
