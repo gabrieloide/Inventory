@@ -8,6 +8,9 @@ struct InventoryDetails: View {
 
     @State private var initialName: String = ""
     @State private var initialSku: String = ""
+    @Environment(\.dismiss) var dismiss
+    @State private var showingDeleteConfirmation: Bool = false
+    @State private var isDeleted: Bool = false
 
     var body: some View {
         List {
@@ -74,16 +77,37 @@ struct InventoryDetails: View {
                     }
                 }
             }
+
+            Section {
+                Button(role: .destructive) {
+                    showingDeleteConfirmation = true
+                } label: {
+                    HStack {
+                        Spacer()
+                        Label("Delete Product", systemImage: "trash")
+                        Spacer()
+                    }
+                }
+            }
         }
         .listStyle(.insetGrouped)
         .navigationTitle(p.name.isEmpty ? "Product Details" : p.name)
         .navigationBarTitleDisplayMode(.inline)
+        .confirmationDialog("Delete Product", isPresented: $showingDeleteConfirmation, titleVisibility: .visible) {
+            Button("Delete", role: .destructive) {
+                deleteCurrentProduct()
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Are you sure you want to delete this product? This action cannot be undone.")
+        }
         .onAppear {
             initialStock = p.stock
             initialName = p.name
             initialSku = p.sku
         }
         .onDisappear {
+            if isDeleted { return }
             if p.name.trimmingCharacters(in: .whitespaces).isEmpty {
                 p.name = initialName
             }
@@ -142,6 +166,26 @@ struct InventoryDetails: View {
         } else {
             return ("\(stock) in stock", .indigo, "checkmark.circle.fill")
         }
+    }
+
+    private func deleteCurrentProduct() {
+        isDeleted = true
+        if let remoteId = p.remoteId {
+            let deleteOp = PendingOperation(
+                type: .delete,
+                productName: p.name,
+                state: .pending,
+                tries: 0,
+                product: nil,
+                remoteId: remoteId
+            )
+            environment.insert(deleteOp)
+            Task {
+                await deleteOp.sync()
+            }
+        }
+        environment.delete(p)
+        dismiss()
     }
 }
 

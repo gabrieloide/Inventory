@@ -3,6 +3,7 @@ import SwiftData
 
 struct PendingView: View {
     @Query(sort: \PendingOperation.tries, order: .reverse) var operations: [PendingOperation]
+    @Environment(\.modelContext) var environment
 
     var body: some View {
         NavigationStack {
@@ -36,13 +37,105 @@ struct PendingView: View {
                                     statusBadge(for: op)
                                 }
                                 .padding(.vertical, 4)
+                                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                    Button(role: .destructive) {
+                                        environment.delete(op)
+                                    } label: {
+                                        Label("Delete", systemImage: "trash")
+                                    }
+                                }
+                                .swipeActions(edge: .leading) {
+                                    if (op.state ?? .pending) == .failed {
+                                        Button {
+                                            Task {
+                                                op.tries = 0
+                                                await op.sync(force: true)
+                                            }
+                                        } label: {
+                                            Label("Retry", systemImage: "arrow.clockwise")
+                                        }
+                                        .tint(.blue)
+                                    }
+                                }
                             }
+                            .onDelete(perform: deleteOperations)
                         }
                     }
                     .listStyle(.insetGrouped)
                 }
             }
             .navigationTitle("Queue")
+            .toolbar {
+                if !operations.isEmpty {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Menu {
+                            Button {
+                                retryFailedOperations()
+                            } label: {
+                                Label("Retry Failed", systemImage: "arrow.clockwise")
+                            }
+
+                            Button(role: .destructive) {
+                                clearFailedOperations()
+                            } label: {
+                                Label("Clear Failed", systemImage: "xmark.circle")
+                            }
+
+                            Button {
+                                clearSyncedOperations()
+                            } label: {
+                                Label("Clear Synced History", systemImage: "checkmark.circle")
+                            }
+
+                            Divider()
+
+                            Button(role: .destructive) {
+                                clearAllOperations()
+                            } label: {
+                                Label("Clear All", systemImage: "trash")
+                            }
+                        } label: {
+                            Image(systemName: "ellipsis.circle")
+                                .font(.system(size: 16, weight: .semibold))
+                        }
+                        .accessibilityLabel("Queue Options")
+                    }
+                }
+            }
+        }
+    }
+
+    private func deleteOperations(at offsets: IndexSet) {
+        for index in offsets {
+            let op = operations[index]
+            environment.delete(op)
+        }
+    }
+
+    private func retryFailedOperations() {
+        Task {
+            for op in operations where (op.state ?? .pending) == .failed {
+                op.tries = 0
+                await op.sync(force: true)
+            }
+        }
+    }
+
+    private func clearFailedOperations() {
+        for op in operations where (op.state ?? .pending) == .failed {
+            environment.delete(op)
+        }
+    }
+
+    private func clearSyncedOperations() {
+        for op in operations where (op.state ?? .pending) == .successful {
+            environment.delete(op)
+        }
+    }
+
+    private func clearAllOperations() {
+        for op in operations {
+            environment.delete(op)
         }
     }
 

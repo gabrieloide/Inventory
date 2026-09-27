@@ -11,6 +11,7 @@ struct DiagnosticView: View {
     }
     
     @State private var isSyncing: Bool = false
+    @Environment(\.modelContext) var environment
 
     var failedCount: Int {
         openOperations.filter { ($0.state ?? .pending) == .failed }.count
@@ -88,6 +89,21 @@ struct DiagnosticView: View {
                     .disabled(isSyncing || openOperations.isEmpty)
                     .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
                     .listRowBackground(Color.clear)
+
+                    if failedCount > 0 {
+                        Button(role: .destructive, action: clearFailedOperations) {
+                            HStack(spacing: 8) {
+                                Image(systemName: "trash")
+                                Text("Clear Failed Operations (\(failedCount))")
+                                    .fontWeight(.semibold)
+                            }
+                            .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.bordered)
+                        .tint(.red)
+                        .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
+                        .listRowBackground(Color.clear)
+                    }
                 }
 
                 Section(header: Text("Developer Options")) {
@@ -116,6 +132,12 @@ struct DiagnosticView: View {
                 await operation.sync(force: true)
             }
             isSyncing = false
+        }
+    }
+
+    private func clearFailedOperations() {
+        for op in allOperations where (op.state ?? .pending) == .failed {
+            environment.delete(op)
         }
     }
 }

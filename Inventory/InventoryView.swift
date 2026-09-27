@@ -130,6 +130,9 @@ struct InventoryView: View {
                     await operation.sync()
                 }
             }
+            for op in allOperations where op.product == item || (op.remoteId != nil && op.remoteId == item.remoteId) || op.productName == item.name {
+                environment.delete(op)
+            }
             environment.delete(item)
         }
     }
