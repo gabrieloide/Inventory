@@ -2,48 +2,119 @@ import SwiftUI
 import SwiftData
 
 struct PendingView: View {
-    @Query var operations: [PendingOperation]
-    
-    let stateColors: [String: Color] = [
-        "pending": .black,
-        "failed": .red,
-        "successful": .green
-    ]
-
+    @Query(sort: \PendingOperation.tries, order: .reverse) var operations: [PendingOperation]
 
     var body: some View {
-        List{
-            Section(header: Text("History Queue"), footer: Text("Operations proccess automatically when there is internet conection")){
-                ForEach(operations) { index in
-                    HStack{
-                        Image(systemName: "clock")
-                        .resizable()
-                        .frame(width: 25, height: 25)
-                        
-                        VStack{
-                            Text(index.type.displayName)
-                            .font(.headline)
-
-                            Text(index.productName)
-                            .font(.subheadline)
-                            
-                        }.padding(.leading, 6.2)
-                        
-                        Spacer()
-                        
-                        Text("\(index.state.displayName) (\(index.tries))")
-                        .padding(.trailing, 15)
-                        .font(.system(size:13))
-                        .foregroundStyle(stateColors[index.state.rawValue] ?? .gray)
-
+        NavigationStack {
+            Group {
+                if operations.isEmpty {
+                    ContentUnavailableView(
+                        "Queue is Empty",
+                        systemImage: "checkmark.circle",
+                        description: Text("All operations are synchronized with the server.")
+                    )
+                } else {
+                    List {
+                        Section(
+                            header: Text("Sync Queue"),
+                            footer: Text("Operations process automatically when network connectivity is restored.")
+                        ) {
+                            ForEach(operations) { op in
+                                HStack(spacing: 12) {
+                                    operationTypeIcon(for: op.type)
+                                    
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(op.productName.isEmpty ? "Product" : op.productName)
+                                            .font(.headline)
+                                        Text(op.type.displayName)
+                                            .font(.subheadline)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                    
+                                    Spacer()
+                                    
+                                    statusBadge(for: op)
+                                }
+                                .padding(.vertical, 4)
+                            }
+                        }
                     }
-                    .padding(.vertical, 7)
+                    .listStyle(.insetGrouped)
                 }
             }
+            .navigationTitle("Queue")
+        }
+    }
+
+    @ViewBuilder
+    private func operationTypeIcon(for type: OperationType) -> some View {
+        let (icon, color) = iconAndColor(for: type)
+        ZStack {
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(color.opacity(0.12))
+                .frame(width: 40, height: 40)
+            Image(systemName: icon)
+                .font(.system(size: 18))
+                .foregroundStyle(color)
+        }
+    }
+
+    private func iconAndColor(for type: OperationType) -> (String, Color) {
+        switch type {
+        case .make:
+            return ("plus", .blue)
+        case .updateStock:
+            return ("arrow.triangle.2.circlepath", .indigo)
+        case .delete:
+            return ("trash", .red)
+        }
+    }
+
+    @ViewBuilder
+    private func statusBadge(for op: PendingOperation) -> some View {
+        switch op.state {
+        case .pending:
+            HStack(spacing: 4) {
+                Image(systemName: "clock")
+                    .font(.system(size: 10, weight: .bold))
+                Text("Pending")
+                    .font(.caption)
+                    .fontWeight(.semibold)
+            }
+            .padding(.horizontal, 9)
+            .padding(.vertical, 5)
+            .background(Color.orange.opacity(0.14), in: Capsule())
+            .foregroundStyle(Color.orange)
+
+        case .successful:
+            HStack(spacing: 4) {
+                Image(systemName: "checkmark")
+                    .font(.system(size: 10, weight: .bold))
+                Text("Synced")
+                    .font(.caption)
+                    .fontWeight(.semibold)
+            }
+            .padding(.horizontal, 9)
+            .padding(.vertical, 5)
+            .background(Color.green.opacity(0.14), in: Capsule())
+            .foregroundStyle(Color.green)
+
+        case .failed:
+            HStack(spacing: 4) {
+                Image(systemName: "exclamationmark.circle.fill")
+                    .font(.system(size: 10, weight: .bold))
+                Text("Failed (\(op.tries))")
+                    .font(.caption)
+                    .fontWeight(.semibold)
+            }
+            .padding(.horizontal, 9)
+            .padding(.vertical, 5)
+            .background(Color.red.opacity(0.14), in: Capsule())
+            .foregroundStyle(Color.red)
         }
     }
 }
 
 #Preview {
-    PendingView().modelContainer(for:[Product.self, PendingOperation.self], inMemory: true)
+    PendingView().modelContainer(for: [Product.self, PendingOperation.self], inMemory: true)
 }

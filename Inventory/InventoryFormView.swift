@@ -2,96 +2,69 @@ import SwiftUI
 import SwiftData
 
 struct InventoryFormView: View {
-    
-    @State var name: String = ""
-    @State var sku: String = ""
-    @State var stock: Int = 0
+    @State private var name: String = ""
+    @State private var sku: String = ""
+    @State private var stock: Int = 0
     @Environment(\.dismiss) var dismiss
     @Environment(\.modelContext) var environment
+    
     var isFormValid: Bool {
-        !name.trimmingCharacters(in: .whitespaces).isEmpty && 
+        !name.trimmingCharacters(in: .whitespaces).isEmpty &&
         !sku.trimmingCharacters(in: .whitespaces).isEmpty
     }
     
-    func saveData(){
-
+    func saveData() {
         let trimmedName = name.trimmingCharacters(in: .whitespaces)
         let trimmedSku = sku.trimmingCharacters(in: .whitespaces)
 
         let product = Product(name: trimmedName, sku: trimmedSku, stock: stock)
-        let pendingOperation = PendingOperation(type: OperationType.make, productName: product.name,deltaStock: nil, state: .pending, tries: 0, product: product)
+        let pendingOperation = PendingOperation(
+            type: .make,
+            productName: product.name,
+            deltaStock: nil,
+            state: .pending,
+            tries: 0,
+            product: product
+        )
         
         environment.insert(pendingOperation)
         environment.insert(product)
 
-        Task{ await pendingOperation.sync() }
-
+        Task { await pendingOperation.sync() }
         dismiss()
     }
     
     var body: some View {
-        
-        NavigationStack{
-            Form{
-                Section{
-                
-                    TextField(
-                        "Type product name",
-                        text: $name
-                    )
-                    TextField(
-                        "SKU",
-                        text: $sku
-                    )
+        NavigationStack {
+            Form {
+                Section(header: Text("Product Details")) {
+                    TextField("Product name", text: $name)
+                    TextField("SKU code", text: $sku)
+                        .textInputAutocapitalization(.characters)
                 }
-                Section{
-                    HStack(spacing: 30){
-                        
-                        Button(action: {
-                            if(stock > 0){
-                                stock -= 1
-                            }
-                        }) {
-                            
-                            Image(systemName: "minus.circle.fill")
-                                .resizable()
-                                .frame(width: 50, height: 50)
-                        }.buttonStyle(.plain).foregroundStyle(.blue)
-                        
-                        VStack{
-                            Text(String(stock)).font(.system(size:35)).bold()
-                            Text("In stock").font(.caption)
-                        }
-                        
-                        Button(action: {stock += 1 }) {
-                            Image(systemName: "plus.circle.fill")
-                                .resizable()
-                                .frame(width: 50, height: 50)
-                        }.buttonStyle(.plain).foregroundStyle(.blue)
-                        
-                    }.padding(15).frame(maxWidth: .infinity)
+                
+                Section(header: Text("Initial Stock")) {
+                    Stepper("Quantity: \(stock)", value: $stock, in: 0...100_000)
                 }
             }
-            .toolbar{
-                ToolbarItem(placement: .topBarLeading){
-                    Button(action:{dismiss()}){
-                        Text("Cancel")
+            .navigationTitle("New Product")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") {
+                        dismiss()
                     }
                 }
-                ToolbarItem(placement: .topBarTrailing){
-                    Button(action: {saveData()} ){
-                        Text("Save")
-                        
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save") {
+                        saveData()
                     }
+                    .fontWeight(.semibold)
                     .disabled(!isFormValid)
                 }
-                
             }
-            
         }
-        
     }
-
 }
 
 #Preview {
