@@ -4,7 +4,7 @@ import SwiftData
 struct InventoryView: View {
     @State var isPresented: Bool = false
     @Query var product: [Product]
-    @Query(filter: #Predicate <PendingOperation> {$0.state != "successful"}) var pendingOperations: [PendingOperation]
+    @Query(filter: #Predicate <PendingOperation> {$0.state.rawValue != "successful"}) var pendingOperations: [PendingOperation]
     @Environment(\.modelContext) var environment
     
     var body: some View {
@@ -26,7 +26,7 @@ struct InventoryView: View {
 
                     if item.remoteId != nil {
 
-                        let operation = PendingOperation(type: .delete, productName: item.name, state: "pending", tries: 0, product: nil, remoteId: item.remoteId)
+                        let operation = PendingOperation(type: .delete, productName: item.name, state: .pending, tries: 0, product: nil, remoteId: item.remoteId)
                         environment.insert(operation)
                         Task{
                             await operation.sync()

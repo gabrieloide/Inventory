@@ -71,7 +71,7 @@ struct InventoryDetails: View {
                 let newStockChange = StockChange(
                     date: Date.now, delta: p.stock - initialStock,source: "Local")
                 
-                let newPendingOperation = PendingOperation(type: OperationType.updateStock, productName: p.name, deltaStock: p.stock - initialStock, state: "pending", tries: 0, product: p)
+                let newPendingOperation = PendingOperation(type: OperationType.updateStock, productName: p.name, deltaStock: p.stock - initialStock, state: .pending, tries: 0, product: p)
                 p.stockChanges.append(newStockChange)
                 environment.insert(newPendingOperation)
 

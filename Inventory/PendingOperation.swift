@@ -14,7 +14,20 @@ public enum OperationType: String, Codable {
             return "Delete"
         }
     }
+}
+public enum OperationState: String, Codable {
+    case pending, successful, failed
 
+    var displayName: String {
+        switch self {
+        case .pending:
+            return "Pending"
+        case .successful:
+            return "Successful"
+        case .failed:
+            return "Failed"
+        }
+    }
 }
 @Model class PendingOperation {
     var type: OperationType
@@ -22,12 +35,12 @@ public enum OperationType: String, Codable {
     var productName: String
     var product: Product?
     var deltaStock: Int?
-    var state: String
+    var state: OperationState
     var tries: Int
     
 
     init(
-        type: OperationType, productName: String, deltaStock: Int? = nil, state: String, tries: Int,
+        type: OperationType, productName: String, deltaStock: Int? = nil, state: OperationState, tries: Int,
         product: Product?, remoteId: Int? = nil
     ) {
         self.type = type
@@ -41,7 +54,7 @@ public enum OperationType: String, Codable {
 
     func upsert() async throws {
         guard let product else {
-            state = "successful"
+            state = .successful
             return
         }
 
@@ -56,33 +69,31 @@ public enum OperationType: String, Codable {
             let created = try await ProductAPI.createProduct(dto)
             product.remoteId = created.productId
         }
-        state = "successful"
+        state = .successful
     }
 
     func sync() async {
 
-        if UserDefaults.standard.bool(forKey: "offlineMode") {
+        if UserDefaults.standard.bool(forKey: AppConstants.Storage.offlineMode) {
             return
         }
-
         do {
-
             switch self.type {
             case .make, .updateStock:
                 try await upsert()
 
             case  .delete:
                 guard let id: Int = self.remoteId else {
-                    state = "successful"
+                    state = .successful
                     return
                 }
                 try await ProductAPI.deleteProduct(productId: id)
-                state = "successful"
+                state = .successful
             }
-            UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: "lastSync")
+            UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: AppConstants.Storage.lastSync)
         } catch {
             print("Error syncing pending operation: \(error)")
-            state = "failed"
+            state = .failed
             tries += 1
         }
 

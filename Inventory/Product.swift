@@ -15,7 +15,6 @@ import SwiftData
         self.stock = stock
         self.remoteId = remoteId
     }
-
 }
 
 @Model class StockChange {
@@ -35,18 +34,32 @@ struct ProductDTO: Codable {
     let sku: String
     let stock: Int
 }
+
 enum ProductAPI {
+
+    static func baseURL () -> String{
+        return "\(AppConstants.API.baseURL)/products"
+    }
+
+    private static func validate(response: URLResponse, allowExtra: Int? = nil) throws {
+        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode)
+         || (allowExtra != nil && allowExtra == http.statusCode) else {
+            throw URLError(.badServerResponse)
+        }
+    }
+
     static func getProducts() async throws -> [ProductDTO] {
-        guard let url = URL(string: "http://localhost:5239/products") else {
+        guard let url = URL(string: ProductAPI.baseURL()) else {
             throw URLError(.badURL)
         }
-        let (data, _) = try await URLSession.shared.data(from: url)
+        let (data, response) = try await URLSession.shared.data(from: url)
+        try ProductAPI.validate(response: response)
         let products = try JSONDecoder().decode([ProductDTO].self, from: data)
         return products
     }
 
     static func createProduct(_ product: ProductDTO) async throws -> ProductDTO {
-        guard let url = URL(string: "http://localhost:5239/products") else {
+        guard let url = URL(string: ProductAPI.baseURL()) else {
             throw URLError(.badURL)
         }
         var request = URLRequest(url: url)
@@ -55,20 +68,13 @@ enum ProductAPI {
         request.httpBody = try JSONEncoder().encode(product)
 
         let (data, response) = try await URLSession.shared.data(for: request)
-        guard let http = response as? HTTPURLResponse else {
-            throw URLError(.badServerResponse)
-        }
-        
-        guard (200...299).contains(http.statusCode) else {
-            throw URLError(.badServerResponse)
-        }
+        try ProductAPI.validate(response: response)
         let created = try JSONDecoder().decode(ProductDTO.self, from: data)
         return created
-
     }
 
     static func updateProduct(_ product: ProductDTO) async throws -> ProductDTO {
-        guard let url = URL(string: "http://localhost:5239/products/\(product.productId)") else {
+        guard let url = URL(string: "\(ProductAPI.baseURL())/\(product.productId)") else {
             throw URLError(.badURL)
         }
         var request = URLRequest(url: url)
@@ -77,35 +83,22 @@ enum ProductAPI {
         request.httpBody = try JSONEncoder().encode(product)
 
         let (data, response) = try await URLSession.shared.data(for: request)
-
-        guard let http = response as? HTTPURLResponse else {
-            throw URLError(.badServerResponse)
-        }
-        
-        guard (200...299).contains(http.statusCode) else {
-            throw URLError(.badServerResponse)
-        }
+        try ProductAPI.validate(response: response)
 
         let updated = try JSONDecoder().decode(ProductDTO.self, from: data)
         return updated
     }
 
     static func deleteProduct(productId: Int) async throws {
-        guard let url = URL(string: "http://localhost:5239/products/\(productId)") else {
+        guard let url = URL(string: "\(ProductAPI.baseURL())/\(productId)") else {
             throw URLError(.badURL)
         }
         var request = URLRequest(url: url)
         request.httpMethod = "DELETE"
 
         let (_, response) = try await URLSession.shared.data(for: request)
-
-        guard let http = response as? HTTPURLResponse else {
-            throw URLError(.badServerResponse)
-        }
-        
-        guard (200...299).contains(http.statusCode) || (404 == http.statusCode) else {
-            throw URLError(.badServerResponse)
-        }
+    
+        try ProductAPI.validate(response: response, allowExtra: 404)
 
     }
 

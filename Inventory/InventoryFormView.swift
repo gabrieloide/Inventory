@@ -12,7 +12,7 @@ struct InventoryFormView: View {
     func saveData(){
         print("data saved")
         let product = Product(name: name, sku: sku, stock: stock)
-        let pendingOperation = PendingOperation(type: OperationType.make, productName: product.name,deltaStock: nil, state: "pending", tries: 0, product: product)
+        let pendingOperation = PendingOperation(type: OperationType.make, productName: product.name,deltaStock: nil, state: .pending, tries: 0, product: product)
         
         environment.insert(pendingOperation)
         environment.insert(product)

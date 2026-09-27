@@ -2,18 +2,18 @@ import SwiftData
 import SwiftUI
 
 struct DiagnosticView: View {
-    @AppStorage("offlineMode") var isOfflineMode: Bool = false
+    @AppStorage(AppConstants.Storage.offlineMode) var isOfflineMode: Bool = false
     @State private var monitor = NetworkMonitor()
-    @AppStorage("lastSync") var lastSync: Double = 0
-    @Query(filter: #Predicate<PendingOperation> { $0.state != "successful" }) var openOperations:
+    @AppStorage(AppConstants.Storage.lastSync) var lastSync: Double = 0
+    @Query(filter: #Predicate<PendingOperation> { $0.state.rawValue != "successful" }) var openOperations:
         [PendingOperation]
 
 
     var failedCount: Int{
-        openOperations.filter({ $0.state == "failed" }).count
+        openOperations.filter({ $0.state == .failed }).count
     }
     var pendingCount: Int{
-        openOperations.filter({ $0.state == "pending" }).count
+        openOperations.filter({ $0.state == .pending }).count
     }
 
     var body: some View {
